@@ -1342,26 +1342,33 @@ function selectGender(g) {
   });
 }
 
+let _ddResults = [];
 function filterTestDropdown() {
   const q = document.getElementById('testSearchInput').value.trim().toLowerCase();
   const dd = document.getElementById('testDropdown');
   if (!q) { dd.classList.remove('open'); return; }
-  const results = ALL_TESTS.filter(t =>
+  _ddResults = ALL_TESTS.filter(t =>
     (t.code.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)) &&
     !selectedTests.find(s => s.code === t.code)
   ).slice(0, 30);
-  if (!results.length) {
+  if (!_ddResults.length) {
     dd.innerHTML = '<div class="test-dropdown-item" style="color:var(--gray);cursor:default;">No tests found</div>';
   } else {
-    dd.innerHTML = results.map(t => {
-      const safeName = t.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-      const safeCode = t.code.replace(/'/g,"\\'");
-      return `<div class="test-dropdown-item" onclick="addTest('${safeCode}','${safeName}',${t.mrp})">
-        <span style="flex:1">${t.name}</span>
+    dd.innerHTML = _ddResults.map((t, i) => {
+      return `<div class="test-dropdown-item" data-ddidx="${i}">
+        <span style="flex:1">${t.name.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
         <span class="code">${t.code}</span>
         <span class="price">\u20b9${t.mrp.toLocaleString('en-IN')}</span>
       </div>`;
     }).join('');
+    dd.querySelectorAll('.test-dropdown-item[data-ddidx]').forEach(function(el) {
+      el.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        const idx = parseInt(el.getAttribute('data-ddidx'));
+        const t = _ddResults[idx];
+        if (t) addTest(t.code, t.name, t.mrp);
+      });
+    });
   }
   dd.classList.add('open');
 }
@@ -1387,8 +1394,12 @@ function renderTestTags() {
   selectedTests.forEach(t => {
     const tag = document.createElement('div');
     tag.className = 'test-tag';
-    const safeCode = t.code.replace(/'/g,"\'");
-    tag.innerHTML = t.name + ' <button onclick="removeTest(\'' + safeCode + '\')">\u2715</button>';
+    const nameSpan = document.createTextNode(t.name + ' ');
+    const btn = document.createElement('button');
+    btn.textContent = '\u2715';
+    btn.addEventListener('click', function() { removeTest(t.code); });
+    tag.appendChild(nameSpan);
+    tag.appendChild(btn);
     wrap.insertBefore(tag, input);
   });
 }
@@ -1647,9 +1658,14 @@ var AG_DATA = [{"sno":1,"dept":"BIOCHEMISTRY","code":"A135","name":"A S O Quanti
     $('drSendBtn').addEventListener('click', function() { sendWA('dr'); });
     $('agSendBtn').addEventListener('click', function() { sendWA('ag'); });
 
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.test-search-wrap')) {
-        document.querySelectorAll('.test-dropdown').forEach(function(x){ x.style.display='none'; });
+    document.addEventListener('mousedown', function(e) {
+      if (!e.target.closest('.test-search-wrap') && !e.target.closest('.test-dropdown') && !e.target.closest('.test-field-wrap')) {
+        document.querySelectorAll('#adminPanel .test-dropdown').forEach(function(x){ x.style.display='none'; });
+      }
+    });
+    document.addEventListener('touchstart', function(e) {
+      if (!e.target.closest('.test-search-wrap') && !e.target.closest('.test-dropdown') && !e.target.closest('.test-field-wrap')) {
+        document.querySelectorAll('#adminPanel .test-dropdown').forEach(function(x){ x.style.display='none'; });
       }
     });
   }
@@ -1676,7 +1692,7 @@ var AG_DATA = [{"sno":1,"dept":"BIOCHEMISTRY","code":"A135","name":"A S O Quanti
     $(type+'UID').value = '';
     $(type+'PWD').value = '';
     sel[type] = [];
-    renderChips(type);
+    pRenderChips(type);
   }
 
   function renderTable(type) {
@@ -1697,48 +1713,84 @@ var AG_DATA = [{"sno":1,"dept":"BIOCHEMISTRY","code":"A135","name":"A S O Quanti
     renderTable(type);
   }
 
+  // Store last search results for index-based lookup (avoids data-attribute encoding issues)
+  var lastDropResults = { dr: [], ag: [] };
+
   function showDrop(type) {
     var q = $(type+'TestSearch').value.toLowerCase();
     var src = type==='dr' ? DR_DATA : AG_DATA;
     var dd = $(type+'TestDropdown');
     if (!q) { dd.style.display='none'; return; }
-    var res = src.filter(function(t){ return t.name.toLowerCase().indexOf(q)>-1 || t.code.toLowerCase().indexOf(q)>-1; }).slice(0,30);
+    var res = src.filter(function(t){
+      return t.name.toLowerCase().indexOf(q)>-1 || t.code.toLowerCase().indexOf(q)>-1;
+    }).slice(0,30);
+    lastDropResults[type] = res;
     if (!res.length) { dd.style.display='none'; return; }
-    dd.innerHTML = res.map(function(t) {
-      return '<div class="test-dropdown-item" data-type="'+type+'" data-code="'+esc(t.code)+'"><span><span style="font-weight:500">'+esc(t.name)+'</span> <span style="color:var(--teal);font-size:0.78rem">['+esc(t.code)+']</span></span><span style="color:var(--green-dark);font-weight:700;font-size:0.82rem">₹'+t.b2b+'</span></div>';
+    dd.innerHTML = res.map(function(t, i) {
+      return '<div class="test-dropdown-item" data-type="'+type+'" data-idx="'+i+'">'
+        +'<span><span style="font-weight:500">'+esc(t.name)+'</span>'
+        +' <span style="color:var(--teal);font-size:0.78rem">['+esc(t.code)+']</span></span>'
+        +'<span style="color:var(--green-dark);font-weight:700;font-size:0.82rem">₹'+t.b2b+'</span>'
+        +'</div>';
     }).join('');
-    dd.querySelectorAll('.test-dropdown-item').forEach(function(el) {
-      el.addEventListener('click', function() { addTest(el.dataset.type, el.dataset.code); });
-    });
+
+    dd.onmousedown = function(e) { e.preventDefault(); };
+
+    dd.onclick = function(e) {
+      var item = e.target.closest('.test-dropdown-item');
+      if (item) {
+        e.stopPropagation();
+        var idx = parseInt(item.getAttribute('data-idx'));
+        var t = lastDropResults[type][idx];
+        if (t) pAddTest(type, t);
+      }
+    };
+
+    dd.ontouchend = function(e) {
+      var item = e.target.closest('.test-dropdown-item');
+      if (item) {
+        e.preventDefault();
+        e.stopPropagation();
+        var idx = parseInt(item.getAttribute('data-idx'));
+        var t = lastDropResults[type][idx];
+        if (t) pAddTest(type, t);
+      }
+    };
+
     dd.style.display = 'block';
   }
 
-  function addTest(type, code) {
-    var src = type==='dr' ? DR_DATA : AG_DATA;
-    var t = src.find(function(x){ return x.code===code; });
-    if (!t || sel[type].find(function(x){ return x.code===code; })) {
+  function pAddTest(type, t) {
+    if (!t) return;
+    if (sel[type].find(function(x){ return x.code===t.code; })) {
       $(type+'TestSearch').value='';
       $(type+'TestDropdown').style.display='none';
       return;
     }
     sel[type].push(t);
-    renderChips(type);
+    pRenderChips(type);
     $(type+'TestSearch').value='';
     $(type+'TestDropdown').style.display='none';
   }
 
-  function removeTest(type, code) {
+  function pRemoveTest(type, code) {
     sel[type] = sel[type].filter(function(x){ return x.code!==code; });
-    renderChips(type);
+    pRenderChips(type);
   }
 
-  function renderChips(type) {
+  function pRenderChips(type) {
     var area = $(type+'SelectedArea');
-    area.innerHTML = sel[type].map(function(t) {
-      return '<span class="test-chip">'+esc(t.name)+' ['+esc(t.code)+'] ₹'+t.b2b+'<button data-type="'+type+'" data-code="'+esc(t.code)+'">×</button></span>';
+    area.innerHTML = sel[type].map(function(t, i) {
+      return '<span class="test-chip">'+esc(t.name)+' ['+esc(t.code)+'] ₹'+t.b2b
+        +'<button data-type="'+type+'" data-idx="'+i+'">×</button></span>';
     }).join('');
     area.querySelectorAll('button').forEach(function(btn) {
-      btn.addEventListener('click', function() { removeTest(btn.dataset.type, btn.dataset.code); });
+      btn.addEventListener('click', function() {
+        var idx = parseInt(btn.getAttribute('data-idx'));
+        var typ = btn.getAttribute('data-type');
+        sel[typ].splice(idx, 1);
+        pRenderChips(typ);
+      });
     });
   }
 
