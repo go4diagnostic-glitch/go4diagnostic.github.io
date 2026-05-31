@@ -158,6 +158,54 @@
   }
   .contact-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(27,168,201,0.4); }
 
+  /* PACKAGE SUGGESTION BOX */
+  .pkg-suggestion-box {
+    display: none; margin-top: 28px;
+    background: linear-gradient(135deg, #fffbea 0%, #fff8e1 100%);
+    border: 2px solid #f6c928; border-radius: 18px; padding: 22px 26px;
+    box-shadow: 0 4px 20px rgba(246,201,40,0.18);
+    animation: fadeIn 0.4s ease;
+  }
+  .pkg-suggestion-box.show { display: block; }
+  .pkg-suggestion-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  }
+  .pkg-suggestion-header .icon { font-size: 1.6rem; }
+  .pkg-suggestion-header h4 { font-size: 1rem; font-weight: 800; color: #7a5c00; }
+  .pkg-suggestion-header p { font-size: 0.82rem; color: #9a7c1a; margin-top: 2px; }
+  .pkg-cards-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .pkg-card {
+    background: white; border-radius: 14px; padding: 16px 20px;
+    border: 1.5px solid #f0d060; flex: 1; min-width: 240px; max-width: 380px;
+    box-shadow: 0 2px 10px rgba(246,201,40,0.1); position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .pkg-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(246,201,40,0.2); }
+  .pkg-card-match {
+    position: absolute; top: -10px; right: 14px;
+    background: linear-gradient(135deg, var(--green), var(--green-dark));
+    color: white; font-size: 0.7rem; font-weight: 800; padding: 3px 10px;
+    border-radius: 10px; letter-spacing: 0.5px;
+  }
+  .pkg-card-name { font-size: 0.92rem; font-weight: 800; color: var(--dark); margin-bottom: 4px; }
+  .pkg-card-code { font-size: 0.72rem; color: var(--teal); font-family: monospace; font-weight: 700; margin-bottom: 8px; }
+  .pkg-card-desc { font-size: 0.78rem; color: var(--gray); line-height: 1.5; margin-bottom: 10px; }
+  .pkg-card-tests { font-size: 0.74rem; color: #555; margin-bottom: 10px; }
+  .pkg-card-tests strong { color: var(--teal); }
+  .pkg-card-price { display: flex; align-items: center; gap: 10px; }
+  .pkg-card-mrp { font-size: 1.1rem; font-weight: 800; color: var(--green-dark); }
+  .pkg-card-cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+    color: white; padding: 7px 16px; border-radius: 20px;
+    font-size: 0.78rem; font-weight: 700; text-decoration: none;
+    cursor: pointer; border: none; font-family: inherit;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 3px 8px rgba(27,168,201,0.3);
+  }
+  .pkg-card-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(27,168,201,0.4); }
+  .pkg-matched-tests { font-size: 0.74rem; background: rgba(27,168,201,0.08); border-radius: 8px; padding: 6px 10px; margin-bottom: 10px; color: var(--teal-dark); font-weight: 600; }
+
   /* DOS (Test List) */
   #dos { background: white; }
   .dos-inner { max-width: 1100px; margin: 0 auto; }
@@ -682,6 +730,7 @@
             <th>Investigation / Test Name</th>
             <th>Sample Type</th>
             <th>MRP (₹)</th>
+            <th>Add</th>
           </tr>
         </thead>
         <tbody id="testTableBody"></tbody>
@@ -695,6 +744,30 @@
           <button class="page-btn" id="nextBtn" onclick="changePage(1)">Next →</button>
         </div>
       </div>
+    </div>
+
+    <!-- DOS SELECTED TESTS & PACKAGE SUGGESTIONS -->
+    <div id="dosSelectedWrap" style="display:none;margin-top:28px;">
+      <div style="background:var(--teal-light);border-radius:14px;padding:18px 22px;border:1.5px solid rgba(27,168,201,0.2);margin-bottom:6px;">
+        <div style="font-size:0.82rem;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">🧪 Tests Added to Check</div>
+        <div id="dosTestChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
+          <a href="#appointment" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#25D366,#1aad52);color:white;padding:9px 20px;border-radius:20px;font-size:0.84rem;font-weight:700;text-decoration:none;box-shadow:0 3px 10px rgba(37,211,102,0.35);">📅 Book These Tests</a>
+          <button onclick="clearDosSelection()" style="background:none;border:1.5px solid #ccc;border-radius:20px;padding:9px 16px;font-size:0.82rem;color:var(--gray);cursor:pointer;font-family:inherit;">✕ Clear All</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PACKAGE SUGGESTION BOX (DOS) -->
+    <div class="pkg-suggestion-box" id="dosPkgSuggestion">
+      <div class="pkg-suggestion-header">
+        <div class="icon">💡</div>
+        <div>
+          <h4>Smart Package Suggestion</h4>
+          <p>Packages covering the most of your selected tests — shown best match first!</p>
+        </div>
+      </div>
+      <div class="pkg-cards-grid" id="dosPkgCards"></div>
     </div>
   </div>
 </section>
@@ -842,6 +915,17 @@
               <div class="test-dropdown" id="testDropdown"></div>
             </div>
             <div style="font-size:0.76rem;color:var(--gray);margin-top:6px;">💡 Search and click to add multiple tests</div>
+          </div>
+          <!-- APPOINTMENT PACKAGE SUGGESTION -->
+          <div class="pkg-suggestion-box appt-full" id="apptPkgSuggestion" style="margin-top:0;">
+            <div class="pkg-suggestion-header">
+              <div class="icon">💡</div>
+              <div>
+                <h4>Better Value Found!</h4>
+                <p>These packages cover your selected tests — consider switching for better savings!</p>
+              </div>
+            </div>
+            <div class="pkg-cards-grid" id="apptPkgCards"></div>
           </div>
           <!-- Collection Type -->
           <div class="form-group appt-full">
@@ -1163,6 +1247,193 @@ ALL_TESTS.forEach(t => {
   }
 });
 
+// ─── OPD PACKAGES DATA ───────────────────────────────────────────────────────
+const OPD_PACKAGES = [
+  { code:'P549', name:'CBC + LFT + KFT', mrp:1250, desc:'Combined organ function and blood count screen', tests:['CBC','LFT','KFT','Liver Panel','Kidney Panel'], keywords:['cbc','complete blood count','lft','liver','kft','kidney','creatinine','urea','bilirubin','sgot','sgpt','albumin','globulin'] },
+  { code:'P209', name:'Lipid Profile', mrp:700, desc:'Complete lipid panel — cholesterol, HDL, LDL, VLDL, triglycerides', tests:['Cholesterol Total','HDL','LDL','VLDL','Triglycerides'], keywords:['lipid','cholesterol','hdl','ldl','vldl','triglyceride','lipoprotein'] },
+  { code:'P247', name:'Thyroid Profile I [T3, T4, TSH]', mrp:700, desc:'Basic thyroid function screen', tests:['T3','T4','TSH'], keywords:['thyroid','tsh','t3','t4','triiodothyronine','thyroxine'] },
+  { code:'P251', name:'Thyroid Profile V [FT3, FT4, TSH]', mrp:750, desc:'Free thyroid hormones + TSH', tests:['FT3','FT4','TSH'], keywords:['ft3','ft4','tsh','free thyroid'] },
+  { code:'P265', name:'Vitamin Duo (B12 + D25 OH)', mrp:1500, desc:'Vitamin B12 and Vitamin D25 combo', tests:['Vitamin B12','Vitamin D'], keywords:['vitamin b12','vitamin d','vit b12','vit d','cyanocobalamin','cholecalciferol'] },
+  { code:'P111', name:'Anemia Profile I', mrp:2500, desc:'Comprehensive anaemia evaluation — iron, B12, folate, CBC, ferritin', tests:['PBS','Iron Panel','Vitamin B12','Folic Acid','CBC','Ferritin'], keywords:['anemia','anaemia','iron','ferritin','b12','folic acid','folate','cbc','peripheral smear','pbs'] },
+  { code:'P245', name:'Thalassemia Profile', mrp:2500, desc:'Thalassemia diagnosis with HPLC haemoglobin', tests:['CBC+ESR','Ferritin','Haemoglobin HPLC','PBS','Iron Panel'], keywords:['thalassemia','hplc','haemoglobin','cbc','ferritin','iron'] },
+  { code:'P145', name:'Diabetic Panel (Mini)', mrp:1350, desc:'Mini diabetes management panel with renal check', tests:['Creatinine','Glucose F+PP','HbA1c','Lipid','Uric Acid','Urine R/M','Urea','Microalbumin'], keywords:['diabetes','diabetic','hba1c','glucose','creatinine','uric acid','microalbumin','lipid','urea'] },
+  { code:'P147', name:'Diabetic Panel Screening', mrp:600, desc:'Quick diabetes screen with glycated haemoglobin', tests:['Glucose F+PP','HbA1c','Urine R/M'], keywords:['hba1c','glucose fasting','glucose post prandial','diabetic'] },
+  { code:'P148', name:'Diabetic Screening Basic', mrp:480, desc:'Two-test diabetes screening', tests:['HbA1c','Glucose Fasting'], keywords:['hba1c','glucose fasting'] },
+  { code:'P210', name:'Liver Panel (LFT)', mrp:800, desc:'Full liver function test panel', tests:['Bilirubin','SGOT','SGPT','Albumin','Globulin','ALP','GGT','Protein'], keywords:['lft','liver','bilirubin','sgot','sgpt','ast','alt','albumin','alkaline phosphatase','alp','ggamma','globulin'] },
+  { code:'P204', name:'Kidney Panel-1 (KFT)', mrp:580, desc:'Kidney function: urea, creatinine, uric acid', tests:['Urea','Creatinine','Uric Acid'], keywords:['kft','kidney','renal','urea','creatinine','uric acid','bun'] },
+  { code:'P449', name:'Kidney Panel-2 (KFT+)', mrp:800, desc:'Extended kidney panel with electrolytes', tests:['Urea','Creatinine','Uric Acid','Sodium','Potassium','Chloride'], keywords:['kidney panel','kft','urea','creatinine','uric acid','electrolyte','sodium','potassium','chloride'] },
+  { code:'P209', name:'Lipid Profile', mrp:700, desc:'Cholesterol, HDL, LDL, Triglycerides, VLDL', tests:['Cholesterol Total','HDL','LDL','Triglycerides'], keywords:['lipid profile','cholesterol','hdl','ldl','triglyceride','vldl'] },
+  { code:'P394', name:'Cardiac Care', mrp:2400, desc:'Cardiovascular risk with advanced lipids and hsCRP', tests:['hsCRP','Lipid Profile','Lipoprotein-a'], keywords:['cardiac','heart','hscrp','crp','lipid','lipoprotein'] },
+  { code:'P139', name:'Cardiac Panel II', mrp:900, desc:'Cardiac enzymes for heart muscle damage', tests:['SGOT','CPK-MB','LDH','CPK-NAC'], keywords:['cardiac','cpk','cpk-mb','ck-mb','ldh','troponin','sgot'] },
+  { code:'P396', name:'Complete Cardiac Care', mrp:3500, desc:'Advanced cardiac risk with Vitamin D and Homocysteine', tests:['hsCRP','Homocysteine','Lipid Profile','Lipoprotein-a','Vitamin D'], keywords:['cardiac','heart','homocysteine','hscrp','vitamin d','lipid','lipoprotein'] },
+  { code:'P415', name:'G4D 1.2 (GO-TD Plus)', mrp:1750, desc:'Diabetes + organ health combined — CBC, glucose, HbA1c, LFT, KFT, thyroid, lipid', tests:['CBC','Glucose','HbA1c','Iron Panel','Lipid','Liver F Test','Thyroid I','KFT'], keywords:['cbc','glucose','hba1c','iron','lipid','liver','thyroid','kidney','kft','lft'] },
+  { code:'P416', name:'G4D 1.3', mrp:2350, desc:'Full health check with vitamins and testosterone', tests:['CBC EXT','Glucose','HbA1c','Iron','Kidney Panel','Lipid','Liver Panel','Thyroid I','Vit B12','Vit D'], keywords:['cbc','glucose','hba1c','iron','kidney','lipid','liver','thyroid','vitamin b12','vitamin d','testosterone'] },
+  { code:'P457', name:'G4D 2.2 Golden', mrp:2000, desc:'Golden tier: sugar + organ function', tests:['CBC','Glucose','HbA1c','Iron Panel','Kidney Mini','Lipid','Liver Panel','Thyroid I'], keywords:['cbc','glucose','hba1c','iron','kidney','lipid','liver','thyroid'] },
+  { code:'P455', name:'G4D 2.1 Silver', mrp:900, desc:'Compact 5-organ health screen', tests:['Iron Panel','Kidney Profile Mini','Lipid Profile','Liver Panel','Thyroid I'], keywords:['iron','kidney','lipid','liver','thyroid'] },
+  { code:'P270', name:'Master Health Check Up 1', mrp:2800, desc:'Master full-body health check — CBC, glucose, HbA1c, lipid, LFT, KFT, thyroid, vitamins, PSA', tests:['Calcium','CBC+ESR','Ferritin','Glucose F+PP','HbA1c','Iron','Kidney Panel','Lipid','Liver Panel','Thyroid I','Vit B12','Vit D'], keywords:['master','complete','cbc','glucose','hba1c','iron','kidney','lipid','liver','thyroid','vitamin b12','vitamin d','psa'] },
+  { code:'P554', name:'CBC + ESR + Widal', mrp:550, desc:'Fever basic — blood count + typhoid screen', tests:['CBC+ESR','Widal Test'], keywords:['cbc','esr','widal','fever','typhoid'] },
+  { code:'P595', name:'CBC + ESR + Widal + Malaria Ag', mrp:700, desc:'Fever panel with malaria antigen', tests:['CBC+ESR','Widal','Malaria Antigen'], keywords:['cbc','esr','widal','malaria','fever'] },
+  { code:'P163', name:'Fever Panel I', mrp:800, desc:'Classic fever screen — malaria + typhoid', tests:['Malaria Parasite Slide','Urine R/M','Widal','CBC EXT'], keywords:['malaria','widal','typhoid','fever','cbc'] },
+  { code:'P697', name:'Fever Panel Advance', mrp:1500, desc:'Advanced fever workup with liver enzymes and CRP', tests:['CBC EXT','CRP','Dengue IgG/IgM','NS1','Malaria Ag','SGOT','SGPT','Urine R/M','Widal','Typhi Dot IgM'], keywords:['fever','cbc','crp','dengue','malaria','sgot','sgpt','widal','typhi'] },
+  { code:'P542', name:'Dengue Elisa Combo', mrp:1800, desc:'Comprehensive dengue confirmation by ELISA', tests:['Dengue IgG ELISA','Dengue IgM ELISA','Dengue NS1 Antigen ELISA'], keywords:['dengue','ns1','igg','igm','elisa'] },
+  { code:'P121', name:'Anti Thyroid Antibodies Panel (TPO+ATG)', mrp:1900, desc:'Detects autoimmune thyroid disease antibodies', tests:['ATG','TPO'], keywords:['tpo','atg','antithyroglobulin','antithyroperoxidase','thyroid antibody','hashimoto'] },
+  { code:'P592', name:'Hashimoto Panel', mrp:1200, desc:'Detects Hashimoto thyroiditis', tests:['FT4','TSH','TPO'], keywords:['hashimoto','tpo','ft4','tsh'] },
+  { code:'P236', name:'PCOS/PCOD Panel', mrp:1900, desc:'Standard PCOS diagnostic panel', tests:['DHEA-SO4','FSH','Insulin Fasting','LH','Prolactin','Testosterone Total'], keywords:['pcos','pcod','fsh','lh','prolactin','dhea','testosterone','insulin'] },
+  { code:'P435', name:'PCOD Gold', mrp:3500, desc:'PCOD gold tier with AMH and DHEA', tests:['AMH','DHEA-SO4','FSH','Insulin Fasting','LH','Prolactin','Testosterone Total'], keywords:['pcos','pcod','amh','dhea','fsh','lh','prolactin','insulin','testosterone'] },
+  { code:'P125', name:'Arthritis Panel Mini', mrp:1400, desc:'Quick arthritis screen including autoimmune markers', tests:['ANA/ANF','RF Qualitative','CRP Qualitative','ASO','Uric Acid','Urine R/M'], keywords:['arthritis','ana','rf','rheumatoid','aso','uric acid','crp'] },
+  { code:'P123', name:'Arthritis Panel I', mrp:1700, desc:'Extended arthritis panel with complement and calcium', tests:['ANA/ANF','ASO','C4 Complement','Calcium','Urine R/M','CRP','RF Quantitative'], keywords:['arthritis','ana','aso','complement','calcium','crp','rheumatoid','rf'] },
+  { code:'P124', name:'Arthritis Panel II', mrp:2400, desc:'Comprehensive arthritis workup with CCP and ESR', tests:['ANA/ANF','CCP Antibodies','CBC+ESR','Uric Acid','Urine R/M','CRP','RF Quantitative'], keywords:['arthritis','ccp','ana','cbc','esr','uric acid','crp','rheumatoid'] },
+  { code:'P115', name:'Ante Natal Panel I', mrp:850, desc:'Basic antenatal infection and blood screening', tests:['Blood Group','CBC','Glucose Random','HBsAg','HIV','Urine R/M','VDRL','HCV'], keywords:['antenatal','ante natal','blood group','cbc','hbsag','hiv','vdrl','hcv','glucose'] },
+  { code:'P550', name:'Routine Investigation 2', mrp:2200, desc:'Routine 11-test pre-admission investigation', tests:['Blood Group','CBC','Glucose','HBsAg','HCV','HIV','Kidney Panel','Liver Panel','TSH','Urine R/M','VDRL'], keywords:['routine','blood group','cbc','glucose','hbsag','hcv','hiv','kidney','liver','tsh','vdrl'] },
+  { code:'P173', name:'Comprehensive Male Health Check', mrp:2600, desc:'Male comprehensive health check with PSA', tests:['Kidney Panel','Lipid','Liver Panel','PSA Total','Thyroid I','Urine R/M','HbA1c','Glucose','Iron','Testosterone','CBC+ESR'], keywords:['male','psa','testosterone','cbc','glucose','hba1c','kidney','lipid','liver','thyroid'] },
+  { code:'P182', name:'Senior Citizen Female Health Check', mrp:2700, desc:'Full senior female health check', tests:['ALP','Bilirubin','Calcium','CBC','Creatinine','Glucose F+PP','Lipid','PBS','Phosphorous','RF','SGOT','SGPT','Thyroid I','Urea','Urine R/M'], keywords:['senior','female','calcium','cbc','creatinine','glucose','lipid','sgot','sgpt','thyroid','urea','rf'] },
+  { code:'P183', name:'Senior Citizen Male Health Check', mrp:2700, desc:'Full senior male health check with PSA', tests:['ALP','Bilirubin','Calcium','CBC','Creatinine','Glucose F+PP','PBS','Phosphorous','PSA Total','RF','SGOT','SGPT','Urea','Urine R/M','Lipid'], keywords:['senior','male','psa','calcium','cbc','creatinine','glucose','lipid','sgot','sgpt','urea','rf'] },
+  { code:'P259', name:'Triple Infection Rapid (HIV, HBsAg, HCV)', mrp:1200, desc:'Rapid screen for three major blood-borne viruses', tests:['HBsAg Rapid','HCV Rapid','HIV I & II Rapid'], keywords:['hiv','hbsag','hcv','hepatitis','rapid'] },
+  { code:'P203', name:'Iron Panel with Ferritin', mrp:950, desc:'Iron store and transport evaluation', tests:['Ferritin','Iron Panel Basic'], keywords:['iron','ferritin'] },
+  { code:'P237', name:'Preoperative Panel I', mrp:580, desc:'Pre-surgery coagulation safety screen', tests:['PT/INR','APTT','Platelet Count'], keywords:['preoperative','pre-op','surgery','pt/inr','inr','aptt','platelet'] },
+];
+
+// ─── PACKAGE MATCHING LOGIC ───────────────────────────────────────────────────
+function matchPackages(selectedTestNames) {
+  if (!selectedTestNames || selectedTestNames.length < 2) return [];
+  const total = selectedTestNames.length;
+  const qTerms = selectedTestNames.map(n => n.toLowerCase());
+
+  const matched = [];
+  OPD_PACKAGES.forEach(pkg => {
+    const matchedItems = [];
+    const unmatchedItems = [];
+
+    // For each selected test, check if this package covers it
+    qTerms.forEach(term => {
+      // Try multi-word match first, then first-word match
+      const termWords = term.split(/[\s\-\/\(\)]+/).filter(w => w.length > 2);
+      const hit = pkg.keywords.some(kw => {
+        return term.includes(kw) || kw.includes(term) ||
+          termWords.some(w => kw.includes(w) || w.includes(kw));
+      });
+      if (hit) matchedItems.push(term);
+      else unmatchedItems.push(term);
+    });
+
+    const matchCount = matchedItems.length;
+    if (matchCount < 2) return; // Need at least 2 matched
+
+    const coveragePct = Math.round((matchCount / total) * 100);
+    const coversAll = matchCount === total;
+
+    matched.push({ pkg, matchCount, matchedItems: [...new Set(matchedItems)], unmatchedItems, coveragePct, coversAll, total });
+  });
+
+  // Sort: full coverage first, then by coverage % desc, then by match count desc
+  const seen = new Set();
+  return matched
+    .sort((a, b) => {
+      if (b.coversAll !== a.coversAll) return b.coversAll - a.coversAll;
+      if (b.coveragePct !== a.coveragePct) return b.coveragePct - a.coveragePct;
+      return b.matchCount - a.matchCount;
+    })
+    .filter(m => {
+      if (seen.has(m.pkg.code)) return false;
+      seen.add(m.pkg.code);
+      return true;
+    })
+    .slice(0, 5);
+}
+
+function buildPkgCard(item, ctaCallback) {
+  const { pkg, matchCount, matchedItems, unmatchedItems, coveragePct, coversAll, total } = item;
+  const badgeColor = coversAll ? 'linear-gradient(135deg,var(--green),var(--green-dark))' : 'linear-gradient(135deg,#f59e0b,#d97706)';
+  const badgeText = coversAll ? `✔ Covers all ${total} tests` : `✔ ${matchCount} of ${total} tests covered`;
+  const matchedStr = matchedItems.map(t => t.replace(/\b\w/g, c=>c.toUpperCase())).join(', ');
+  const unmatchedHtml = unmatchedItems && unmatchedItems.length
+    ? `<div style="font-size:0.72rem;color:#b45309;background:#fef3c7;border-radius:6px;padding:5px 10px;margin-bottom:8px;">⚠️ Not covered: <strong>${unmatchedItems.map(t=>t.replace(/\b\w/g,c=>c.toUpperCase())).join(', ')}</strong></div>`
+    : '';
+  return `<div class="pkg-card" style="${coversAll ? 'border-color:#6abf3b;' : ''}">
+    <div class="pkg-card-match" style="background:${badgeColor}">${badgeText}</div>
+    <div class="pkg-card-name">${pkg.name}</div>
+    <div class="pkg-card-code">${pkg.code}</div>
+    <div class="pkg-card-desc">${pkg.desc}</div>
+    <div class="pkg-matched-tests">🔗 Your tests covered: <strong>${matchedStr}</strong></div>
+    ${unmatchedHtml}
+    <div class="pkg-card-tests"><strong>Package includes:</strong> ${pkg.tests.join(' · ')}</div>
+    <div class="pkg-card-price">
+      <span class="pkg-card-mrp">₹${pkg.mrp.toLocaleString('en-IN')}</span>
+      <button class="pkg-card-cta" onclick="${ctaCallback}('${pkg.code}','${pkg.name.replace(/'/g,"\\'")}',${pkg.mrp})">✅ Add to Booking</button>
+    </div>
+  </div>`;
+}
+
+// DOS section package selection tracker
+let dosSelectedTests = [];
+
+function dosAddTest(code, name, mrp) {
+  if (dosSelectedTests.find(t => t.code === code)) {
+    // Remove if already added (toggle)
+    dosSelectedTests = dosSelectedTests.filter(t => t.code !== code);
+  } else {
+    dosSelectedTests.push({ code, name, mrp });
+  }
+  renderDosSelection();
+}
+
+function renderDosSelection() {
+  const wrap = document.getElementById('dosSelectedWrap');
+  const chips = document.getElementById('dosTestChips');
+  const pkgBox = document.getElementById('dosPkgSuggestion');
+  const pkgCards = document.getElementById('dosPkgCards');
+
+  if (!dosSelectedTests.length) {
+    wrap.style.display = 'none';
+    pkgBox.classList.remove('show');
+    return;
+  }
+  wrap.style.display = 'block';
+  chips.innerHTML = dosSelectedTests.map(t =>
+    `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--teal);color:white;padding:5px 14px;border-radius:20px;font-size:0.8rem;font-weight:600;">
+      ${t.name} <button onclick="dosAddTest('${t.code}','','0')" style="background:none;border:none;color:white;cursor:pointer;font-size:0.9rem;line-height:1;padding:0;opacity:0.75;">×</button>
+    </span>`
+  ).join('');
+
+  // Match packages
+  const matches = matchPackages(dosSelectedTests.map(t => t.name));
+  if (matches.length) {
+    pkgBox.classList.add('show');
+    pkgCards.innerHTML = matches.map(m => buildPkgCard(m, 'bookDosPackage')).join('');
+  } else {
+    pkgBox.classList.remove('show');
+  }
+  // Also update DOS table rows to show which are selected
+  renderTable();
+}
+
+function clearDosSelection() {
+  dosSelectedTests = [];
+  renderDosSelection();
+}
+
+function bookDosPackage(code, name, mrp) {
+  // Directly add to appointment selectedTests
+  if (!selectedTests.find(t => t.code === code)) {
+    selectedTests.push({ code: code, name: name, mrp: mrp });
+  } else {
+    // Already there — just scroll
+  }
+  renderTestTags();
+  // Scroll smoothly to appointment section
+  const apptSection = document.getElementById('appointment');
+  if (apptSection) apptSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Flash the test tags wrap to draw attention
+  setTimeout(() => {
+    const wrap = document.getElementById('testTagsWrap');
+    if (wrap) {
+      wrap.style.transition = 'box-shadow 0.3s';
+      wrap.style.boxShadow = '0 0 0 4px rgba(27,168,201,0.4)';
+      setTimeout(() => { wrap.style.boxShadow = ''; }, 1200);
+    }
+  }, 600);
+}
+
 // ─── PROMO CODE ─────────────────────────────────────────────────────────────
 let promoApplied = false;
 function applyPromoCode() {
@@ -1307,15 +1578,18 @@ function renderTable() {
   }
   noResults.style.display = 'none';
 
-  tbody.innerHTML = page.map((t, i) => `
-    <tr>
+  tbody.innerHTML = page.map((t, i) => {
+    const isSelected = dosSelectedTests.find(s => s.code === t.code);
+    return `
+    <tr style="${isSelected ? 'background:rgba(27,168,201,0.08);' : ''}">
       <td>${start + i + 1}</td>
       <td>${t.code}</td>
       <td>${t.name}</td>
       <td style="font-size:0.78rem;color:var(--gray);">${t.sampleType || '—'}</td>
       <td>₹${t.mrp.toLocaleString('en-IN')}</td>
+      <td><button onclick="dosAddTest('${t.code.replace(/'/g,"\\'")}','${t.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${t.mrp})" style="background:${isSelected?'var(--green)':'var(--teal)'};color:white;border:none;border-radius:16px;padding:5px 12px;font-size:0.75rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">${isSelected?'✔ Added':'+ Add'}</button></td>
     </tr>
-  `).join('');
+  `}).join('');
 
   document.getElementById('pageInfo').textContent = `Showing ${start+1}–${end} of ${filtered.length} tests`;
   document.getElementById('pageIndicator').textContent = `Page ${currentPage} / ${totalPages}`;
@@ -1402,6 +1676,40 @@ function renderTestTags() {
     tag.appendChild(btn);
     wrap.insertBefore(tag, input);
   });
+  // Update package suggestions in appointment section
+  updateApptPackageSuggestions();
+}
+
+function updateApptPackageSuggestions() {
+  const pkgBox = document.getElementById('apptPkgSuggestion');
+  const pkgCards = document.getElementById('apptPkgCards');
+  if (!pkgBox || !pkgCards) return;
+  if (selectedTests.length < 2) {
+    pkgBox.classList.remove('show');
+    return;
+  }
+  const matches = matchPackages(selectedTests.map(t => t.name));
+  if (matches.length) {
+    pkgBox.classList.add('show');
+    pkgCards.innerHTML = matches.map(m => buildPkgCard(m, 'addApptPackage')).join('');
+  } else {
+    pkgBox.classList.remove('show');
+  }
+}
+
+function addApptPackage(code, name, mrp) {
+  // Add the package to selected tests (don't duplicate)
+  if (!selectedTests.find(t => t.code === code)) {
+    selectedTests.push({ code: code, name: name, mrp: mrp });
+  }
+  renderTestTags();
+  // Flash the test tags wrap to show it was added
+  const wrap = document.getElementById('testTagsWrap');
+  if (wrap) {
+    wrap.style.transition = 'box-shadow 0.3s';
+    wrap.style.boxShadow = '0 0 0 4px rgba(106,191,59,0.5)';
+    setTimeout(() => { wrap.style.boxShadow = ''; }, 1000);
+  }
 }
 
 function handleTestKey(e) {
