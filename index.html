@@ -1167,11 +1167,7 @@
             <textarea class="cf-input" id="cfMessage" rows="3" placeholder="e.g. I want to book a blood test for diabetes checkup..." style="resize:vertical;"></textarea>
           </div>
         </div>
-        <div class="cf-consent">
-          <input type="checkbox" id="cfConsent">
-          <label for="cfConsent">I agree to share my name and mobile number with Go 4 Diagnostic so they can contact me on WhatsApp to respond to my query.</label>
-        </div>
-        <button class="cf-submit" id="cfSubmitBtn" onclick="submitContactForm()" disabled>
+        <button class="cf-submit" id="cfSubmitBtn" onclick="submitContactForm()">
           💬 Send via WhatsApp
         </button>
       </div>
@@ -1188,7 +1184,7 @@
 <!-- CONTACT POPUP -->
 <div class="cf-overlay" id="cfPopupOverlay">
   <div class="cf-popup">
-    <button class="cf-popup-close" onclick="closeCfPopup()" title="Close">✕</button>
+
     <h3>📩 Send Us a Message</h3>
     <p>Have a query? Share your details and we'll get back to you on WhatsApp!</p>
     <div id="cfPopupForm">
@@ -1206,11 +1202,7 @@
           <textarea class="cf-input" id="cfPopupMessage" rows="2" placeholder="e.g. I want to book a blood test..." style="resize:vertical;"></textarea>
         </div>
       </div>
-      <div class="cf-consent">
-        <input type="checkbox" id="cfPopupConsent">
-        <label for="cfPopupConsent">I agree to share my name and mobile number with Go 4 Diagnostic so they can contact me on WhatsApp.</label>
-      </div>
-      <button class="cf-submit" id="cfPopupSubmitBtn" onclick="submitPopupForm()" disabled>
+      <button class="cf-submit" id="cfPopupSubmitBtn" onclick="submitPopupForm()">
         💬 Send via WhatsApp
       </button>
     </div>
@@ -2046,15 +2038,8 @@ function initPopup() {
   var overlay = document.getElementById('cfPopupOverlay');
   if (!overlay) return;
 
-  var lastShown = localStorage.getItem('cfPopupLastShown');
-  var now = Date.now();
-  var oneDay = 24 * 60 * 60 * 1000;
-
   setTimeout(function() {
-    if (!lastShown || (now - parseInt(lastShown)) > oneDay) {
-      overlay.classList.add('open');
-      localStorage.setItem('cfPopupLastShown', now.toString());
-    }
+    overlay.classList.add('open');
   }, 3000);
 
   overlay.addEventListener('click', function(e) {
@@ -2076,9 +2061,7 @@ if (document.readyState === 'loading') {
 // Clear old session flag if exists
 try { sessionStorage.removeItem('cfPopupShown'); } catch(e) {}
 
-document.getElementById('cfPopupConsent').addEventListener('change', function() {
-  document.getElementById('cfPopupSubmitBtn').disabled = !this.checked;
-});
+
 
 function submitPopupForm() {
   var name = document.getElementById('cfPopupName').value.trim();
@@ -2102,9 +2085,7 @@ function submitPopupForm() {
 }
 
 // VOLUNTARY CONTACT FORM
-document.getElementById('cfConsent').addEventListener('change', function() {
-  document.getElementById('cfSubmitBtn').disabled = !this.checked;
-});
+
 
 function submitContactForm() {
   var name = document.getElementById('cfName').value.trim();
