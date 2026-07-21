@@ -1002,5 +1002,47 @@ document.querySelectorAll('.modal-bg').forEach(m=>{
 toggleRefField();
 calcTotals();
 </script>
-</body>
+</body><script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, query, orderBy } 
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAV8P31Qtn4oN0iglGGreZ6ms4Rl5KwMsY",
+    authDomain: "go4diagnostic.firebaseapp.com",
+    projectId: "go4diagnostic",
+    storageBucket: "go4diagnostic.firebasestorage.app",
+    messagingSenderId: "927304157464",
+    appId: "1:927304157464:web:9283f85a97c354b856766d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Save a new patient
+  window.addPatient = async function(patientData) {
+    try {
+      await addDoc(collection(db, "patients"), {
+        ...patientData,
+        createdAt: new Date().toISOString()
+      });
+      return true;
+    } catch (err) {
+      console.error("Error saving patient:", err);
+      return false;
+    }
+  };
+
+  // Load all patients (newest first)
+  window.loadPatients = async function() {
+    try {
+      const q = query(collection(db, "patients"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err) {
+      console.error("Error loading patients:", err);
+      return [];
+    }
+  };
+</script>
 </html>
