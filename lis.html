@@ -341,35 +341,48 @@ const DEFAULT_TESTS = [{"code":"A135","name":"A S O Quantitative","price":500,"d
 /* Upload payment.html to your website/hosting, then paste its live URL here. */
 const PAYMENT_PAGE_URL = "https://go4diagnostic.in/payment.html";
 
-/* ================= DATA LAYER (localStorage) ================= */
-const LS_PATIENTS = 'lms_patients';
-const LS_TESTS = 'lms_tests';
-const LS_TESTS_VERSION = 'lms_tests_version';
-const LS_COUNTER = 'lms_sin_counter';
+/* ================= DATA LAYER (Cloud - Firebase Firestore) =================
+   All clinic data lives in one shared cloud document. The functions below
+   keep the exact same names/behavior the rest of the app already expects,
+   but read/write from window.__cloudState (a local mirror of that cloud
+   document) instead of localStorage. window.__pushStateToCloud() (defined
+   in the Firebase script near the bottom of this file) uploads any change
+   so every other open browser/device receives it in real time. */
 const CLINIC_WHATSAPP = '910000000000'; // TODO: set real clinic number (used only for reference)
 
-function loadPatients(){ return JSON.parse(localStorage.getItem(LS_PATIENTS) || '[]'); }
-function savePatients(list){ localStorage.setItem(LS_PATIENTS, JSON.stringify(list)); }
+window.__cloudState = window.__cloudState || { patients: [], tests: null, testsVersion: null, counter: 100000 };
+window.__firebaseReady = window.__firebaseReady || false;
+
+function loadPatients(){ return window.__cloudState.patients || []; }
+function savePatients(list){
+  window.__cloudState.patients = list;
+  if(window.__pushStateToCloud) window.__pushStateToCloud();
+}
 function loadTests(){
   const VERSION = 'v2-full-rate-list';
-  let t = JSON.parse(localStorage.getItem(LS_TESTS) || 'null');
-  const storedVersion = localStorage.getItem(LS_TESTS_VERSION);
+  let t = window.__cloudState.tests;
+  const storedVersion = window.__cloudState.testsVersion;
   if(!t){
     t = (typeof DEFAULT_TESTS !== 'undefined') ? DEFAULT_TESTS.slice() : [];
-    localStorage.setItem(LS_TESTS, JSON.stringify(t));
-    localStorage.setItem(LS_TESTS_VERSION, VERSION);
+    window.__cloudState.tests = t;
+    window.__cloudState.testsVersion = VERSION;
+    if(window.__pushStateToCloud) window.__pushStateToCloud();
   } else if(storedVersion !== VERSION && typeof DEFAULT_TESTS !== 'undefined'){
     // Merge the official rate list into whatever is already saved, keeping any custom entries the clinic added.
     const byCode = {};
     DEFAULT_TESTS.forEach(d=>byCode[d.code]=d);
     t.forEach(existing=>{ if(!byCode[existing.code]) byCode[existing.code]=existing; });
     t = Object.values(byCode);
-    localStorage.setItem(LS_TESTS, JSON.stringify(t));
-    localStorage.setItem(LS_TESTS_VERSION, VERSION);
+    window.__cloudState.tests = t;
+    window.__cloudState.testsVersion = VERSION;
+    if(window.__pushStateToCloud) window.__pushStateToCloud();
   }
   return t;
 }
-function saveTests(t){ localStorage.setItem(LS_TESTS, JSON.stringify(t)); }
+function saveTests(t){
+  window.__cloudState.tests = t;
+  if(window.__pushStateToCloud) window.__pushStateToCloud();
+}
 function testsByCode(){
   const map = {};
   loadTests().forEach(t=>map[t.code]=t);
@@ -386,8 +399,9 @@ function populateDeptSelect(selectEl){
   selectEl.value = cur;
 }
 function nextSin(){
-  let n = parseInt(localStorage.getItem(LS_COUNTER) || '100000', 10) + 1;
-  localStorage.setItem(LS_COUNTER, n);
+  let n = parseInt(window.__cloudState.counter || 100000, 10) + 1;
+  window.__cloudState.counter = n;
+  if(window.__pushStateToCloud) window.__pushStateToCloud();
   return 'GFD' + n;
 }
 function fmt(n){ return '₹' + (Math.round((n||0)*100)/100).toLocaleString('en-IN'); }
@@ -412,8 +426,24 @@ function lisLogin(){
 function enterApp(dept){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appScreen').style.display='block';
-  switchDept(dept);
+  waitForCloudThenEnter(dept);
 }
+function waitForCloudThenEnter(dept, attempts){
+  attempts = attempts || 0;
+  // Give the cloud a brief moment to deliver the latest data on first login,
+  // so we don't flash stale/empty data before it arrives. Falls through
+  // after ~3 seconds even if offline, so the app still opens.
+  if(window.__firebaseReady || attempts > 30){
+    switchDept(dept);
+  } else {
+    setTimeout(()=>waitForCloudThenEnter(dept, attempts+1), 100);
+  }
+}
+window.currentDeptRefresh = function(){
+  if(document.getElementById('appScreen').style.display === 'block'){
+    switchDept(currentDept);
+  }
+};
 function logout(){
   document.getElementById('appScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -1002,9 +1032,16 @@ document.querySelectorAll('.modal-bg').forEach(m=>{
 toggleRefField();
 calcTotals();
 </script>
-</body><script type="module">
+<script type="module">
+  /* ===================================================================
+     CLOUD SYNC ENGINE (Firebase Firestore)
+     Keeps ONE shared copy of all clinic data (patients, tests, the SIN
+     counter) in the cloud. Every browser/device that opens this page
+     stays in sync in real time: any change made anywhere is pushed to
+     the cloud and instantly pulled into every other open tab/device.
+     =================================================================== */
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, query, orderBy } 
+  import { getFirestore, doc, setDoc, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -1018,31 +1055,31 @@ calcTotals();
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const stateRef = doc(db, "lms_data", "state");
 
-  // Save a new patient
-  window.addPatient = async function(patientData) {
-    try {
-      await addDoc(collection(db, "patients"), {
-        ...patientData,
-        createdAt: new Date().toISOString()
+  let saveTimer = null;
+  window.__pushStateToCloud = function () {
+    // Debounce: if several changes happen quickly, only send the latest.
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      setDoc(stateRef, window.__cloudState).catch(err => {
+        console.error("Cloud save failed:", err);
+        alert("Could not sync to the cloud. Check your internet connection.");
       });
-      return true;
-    } catch (err) {
-      console.error("Error saving patient:", err);
-      return false;
-    }
+    }, 300);
   };
 
-  // Load all patients (newest first)
-  window.loadPatients = async function() {
-    try {
-      const q = query(collection(db, "patients"), orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (err) {
-      console.error("Error loading patients:", err);
-      return [];
+  onSnapshot(stateRef, (snap) => {
+    if (snap.exists()) {
+      window.__cloudState = snap.data();
     }
-  };
+    window.__firebaseReady = true;
+    if (typeof window.currentDeptRefresh === 'function') {
+      window.currentDeptRefresh();
+    }
+  }, (err) => {
+    console.error("Cloud sync error:", err);
+  });
 </script>
+</body>
 </html>
