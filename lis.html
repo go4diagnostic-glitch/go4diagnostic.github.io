@@ -425,14 +425,14 @@ function lisLogin(){
   }
   err.style.display = 'none';
   if(btn){ btn.disabled = true; btn.textContent = 'Signing in...'; }
-  window.__firebaseSignIn(uid, pwd).then(function(success){
+  window.__firebaseSignIn(uid, pwd).then(function(result){
     if(btn){ btn.disabled = false; btn.textContent = 'Login'; }
-    if(success){
+    if(result.success){
       err.style.display = 'none';
       document.getElementById('lisCredWrap').style.display = 'none';
       document.getElementById('lisDeptWrap').style.display = 'block';
     } else {
-      err.textContent = 'Incorrect ID or password.';
+      err.textContent = 'Login error: ' + (result.code || result.message || 'unknown');
       err.style.display = 'block';
     }
   });
@@ -1261,8 +1261,8 @@ async function downloadWithLetterhead(id){
   window.__firebaseSignIn = function (username, password) {
     const email = username.trim() + "@go4diagnostic.local";
     return signInWithEmailAndPassword(auth, email, password)
-      .then(() => { startCloudSync(); return true; })
-      .catch(err => { console.error("Login failed:", err); return false; });
+      .then(() => { startCloudSync(); return { success: true }; })
+      .catch(err => { console.error("Login failed:", err); return { success: false, code: err.code, message: err.message }; });
   };
 
   window.__firebaseSignOut = function () {
