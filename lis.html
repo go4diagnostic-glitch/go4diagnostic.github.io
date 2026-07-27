@@ -409,6 +409,10 @@ function nextSin(){
   return 'GFD' + n;
 }
 function fmt(n){ return '₹' + (Math.round((n||0)*100)/100).toLocaleString('en-IN'); }
+// jsPDF's built-in fonts (Helvetica etc.) don't include a proper glyph for the
+// ₹ symbol, so it prints as a stray/garbled character. Use "Rs." instead for
+// anything drawn into a PDF (receipts, letterhead reports, etc.).
+function fmtPdf(n){ return 'Rs. ' + (Math.round((n||0)*100)/100).toLocaleString('en-IN'); }
 function testListStr(tests){ return (tests||[]).map(t=>`${t.name} <span class="note">[${t.code}]</span>`).join(', '); }
 
 /* ================= LOGIN / NAV ================= */
@@ -425,14 +429,14 @@ function lisLogin(){
   }
   err.style.display = 'none';
   if(btn){ btn.disabled = true; btn.textContent = 'Signing in...'; }
-  window.__firebaseSignIn(uid, pwd).then(function(result){
+  window.__firebaseSignIn(uid, pwd).then(function(success){
     if(btn){ btn.disabled = false; btn.textContent = 'Login'; }
-    if(result.success){
+    if(success){
       err.style.display = 'none';
       document.getElementById('lisCredWrap').style.display = 'none';
       document.getElementById('lisDeptWrap').style.display = 'block';
     } else {
-      err.textContent = 'Login error: ' + (result.code || result.message || 'unknown');
+      err.textContent = 'Incorrect ID or password.';
       err.style.display = 'block';
     }
   });
@@ -663,15 +667,15 @@ function downloadReceipt(id){
     doc.text('Code', 36, y); doc.text('Test', 90, y); doc.text('Amount', 480, y); y += 10;
     doc.line(36,y,559,y); y += 16;
     doc.setFont('helvetica','normal');
-    p.tests.forEach(t=>{ doc.text(t.code||'-', 36, y); doc.text(t.name, 90, y, {maxWidth:370}); doc.text(fmt(t.price), 480, y); y += 18; });
+    p.tests.forEach(t=>{ doc.text(t.code||'-', 36, y); doc.text(t.name, 90, y, {maxWidth:370}); doc.text(fmtPdf(t.price), 480, y); y += 18; });
     y += 6; doc.line(36,y,559,y); y += 20;
 
     const rows = [
-      ['Gross Amount', fmt(p.grossAmount)],
-      ['Discount ('+p.discountPercent+'%)', '-'+fmt(p.discountAmount)],
-      ['Net Payable', fmt(p.netAmount)],
-      ['Paid', fmt(p.paidAmount)],
-      ['Balance Due', fmt(Math.max(0,p.netAmount-p.paidAmount))]
+      ['Gross Amount', fmtPdf(p.grossAmount)],
+      ['Discount ('+p.discountPercent+'%)', '-'+fmtPdf(p.discountAmount)],
+      ['Net Payable', fmtPdf(p.netAmount)],
+      ['Paid', fmtPdf(p.paidAmount)],
+      ['Balance Due', fmtPdf(Math.max(0,p.netAmount-p.paidAmount))]
     ];
     rows.forEach(([l,v],i)=>{
       doc.setFont('helvetica', i>=2?'bold':'normal');
@@ -1121,7 +1125,7 @@ async function downloadWithLetterhead(id){
     const arrayBuffer = await res.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const totalPages = pdf.numPages;
-    const headerH = 120;
+    const headerH = 100;
     const scale = 2;
 
     const { jsPDF } = window.jspdf;
@@ -1261,8 +1265,8 @@ async function downloadWithLetterhead(id){
   window.__firebaseSignIn = function (username, password) {
     const email = username.trim() + "@go4diagnostic.local";
     return signInWithEmailAndPassword(auth, email, password)
-      .then(() => { startCloudSync(); return { success: true }; })
-      .catch(err => { console.error("Login failed:", err); return { success: false, code: err.code, message: err.message }; });
+      .then(() => { startCloudSync(); return true; })
+      .catch(err => { console.error("Login failed:", err); return false; });
   };
 
   window.__firebaseSignOut = function () {
