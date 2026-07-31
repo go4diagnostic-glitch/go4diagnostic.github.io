@@ -134,6 +134,7 @@ const DEFAULT_TESTS = [{"code":"A135","name":"A S O Quantitative","price":500,"d
       <button class="role-btn" onclick="enterApp('front')">🧾 Front Office<small>Register patients, book tests, print receipts</small></button>
       <button class="role-btn" onclick="enterApp('lab')">🧪 Laboratory<small>Manage samples, upload &amp; dispatch reports</small></button>
       <button class="role-btn" onclick="enterApp('admin')">⚙️ Admin<small>Full access — edit records, tests &amp; payments</small></button>
+      <button class="role-btn" onclick="enterApp('accounts')">💰 Accounts<small>Daily ledger, cash &amp; online payment reports</small></button>
     </div>
   </div>
 </div>
@@ -148,6 +149,7 @@ const DEFAULT_TESTS = [{"code":"A135","name":"A S O Quantitative","price":500,"d
     <button data-dept="front" onclick="switchDept('front')">Front Office</button>
     <button data-dept="lab" onclick="switchDept('lab')">Laboratory</button>
     <button data-dept="admin" onclick="switchDept('admin')">Admin</button>
+    <button data-dept="accounts" onclick="switchDept('accounts')">Accounts</button>
     <button onclick="logout()" style="background:rgba(255,255,255,.08)">⎋ Switch</button>
   </nav>
 </header>
@@ -198,9 +200,10 @@ const DEFAULT_TESTS = [{"code":"A135","name":"A S O Quantitative","price":500,"d
       </fieldset>
 
       <div class="grid" style="margin-top:14px;">
-        <div class="field"><label>Discount %</label><input type="number" min="0" max="100" id="f_discPct" value="0" oninput="calcTotals('pct')"></div>
-        <div class="field"><label>Discount Amount (₹)</label><input type="number" min="0" id="f_discAmt" value="0" oninput="calcTotals('amt')"></div>
-        <div class="field"><label>Advance Paid Now (₹)</label><input type="number" min="0" id="f_advance" value="0" oninput="calcTotals()"></div>
+        <div class="field"><label>Discount %</label><input type="number" step="0.01" min="0" max="100" id="f_discPct" value="0" oninput="calcTotals('pct')"></div>
+        <div class="field"><label>Discount Amount (₹)</label><input type="number" step="0.01" min="0" id="f_discAmt" value="0" oninput="calcTotals('amt')"></div>
+        <div class="field"><label>Advance Paid Now (₹)</label><input type="number" step="0.01" min="0" id="f_advance" value="0" oninput="calcTotals()"></div>
+        <div class="field"><label>Payment Mode</label><select id="f_payMode"><option value="Cash">Cash</option><option value="Online">Online</option></select></div>
       </div>
 
       <div class="totals">
@@ -296,6 +299,35 @@ const DEFAULT_TESTS = [{"code":"A135","name":"A S O Quantitative","price":500,"d
       <table>
         <thead><tr><th>Code</th><th>Name</th><th>Dept / Category</th><th>Type</th><th>Price</th><th></th></tr></thead>
         <tbody id="testMasterBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="view-accounts" class="deptview" style="display:none;">
+  <div class="card">
+    <div class="flex-between">
+      <h2 style="border:none;margin:0;">Daily Ledger <span class="badge" id="ledgerCount">0</span></h2>
+    </div>
+    <div class="row-flex" style="margin-bottom:12px;align-items:flex-end;">
+      <div class="field" style="max-width:200px;"><label>Date</label><input type="date" id="acc_date" onchange="renderAccountsLedger()"></div>
+      <button class="btn btn-outline" onclick="setAccDateToday()">Today</button>
+      <button class="btn btn-primary" onclick="downloadDailyLedgerPDF()">⬇️ Download PDF</button>
+    </div>
+    <div style="max-height:480px;overflow:auto;">
+      <table>
+        <thead><tr><th>Time</th><th>SIN No</th><th>Patient</th><th>Description</th><th>Mode</th><th>Amount</th></tr></thead>
+        <tbody id="ledgerTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Summary — Total Sale</h2>
+    <div style="max-width:420px;">
+      <table>
+        <thead><tr><th>Description</th><th>Amount</th></tr></thead>
+        <tbody id="ledgerSummaryBody"></tbody>
       </table>
     </div>
   </div>
@@ -477,11 +509,12 @@ function switchDept(dept){
   document.querySelectorAll('.deptview').forEach(v=>v.style.display='none');
   document.getElementById('view-'+dept).style.display='block';
   document.querySelectorAll('#deptTabs button[data-dept]').forEach(b=>b.classList.toggle('active', b.dataset.dept===dept));
-  const labels = {front:'Front Office', lab:'Laboratory', admin:'Admin'};
+  const labels = {front:'Front Office', lab:'Laboratory', admin:'Admin', accounts:'Accounts'};
   document.getElementById('deptLabel').textContent = labels[dept];
   if(dept==='front'){ populateDeptSelect(document.getElementById('f_testDept')); renderTestPicker('front'); renderFrontTable(); }
   if(dept==='lab'){ renderLabTable(); }
   if(dept==='admin'){ renderAdminTable(); populateDeptSelect(document.getElementById('tm_dept')); renderTestMaster(); }
+  if(dept==='accounts'){ renderAccountsLedger(); }
 }
 
 /* ================= FRONT OFFICE: REGISTRATION ================= */
@@ -570,6 +603,8 @@ document.getElementById('regForm').addEventListener('submit', function(e){
   const refType = document.querySelector('input[name=refType]:checked').value;
   const refName = refType==='self' ? 'SELF' : (document.getElementById('f_refname').value.trim() || '—');
   const totals = calcTotals();
+  const payMode = document.getElementById('f_payMode').value;
+  const nowISO = new Date().toISOString();
 
   const patient = {
     id: 'P' + Date.now(),
@@ -585,11 +620,12 @@ document.getElementById('regForm').addEventListener('submit', function(e){
     discountAmount: totals.discAmt,
     netAmount: totals.net,
     paidAmount: totals.advance,
+    payments: totals.advance > 0 ? [{ amount: totals.advance, mode: payMode, date: nowISO }] : [],
     paymentStatus: totals.advance<=0 ? 'Due' : (totals.advance>=totals.net ? 'Paid' : 'Partial'),
     status: 'Registered',
     reportFileName: null,
     reportFileType: null,
-    createdAt: new Date().toISOString()
+    createdAt: nowISO
   };
   const list = loadPatients();
   list.unshift(patient);
@@ -929,8 +965,8 @@ function openEditModal(id){
       <div class="note" id="e_selectedNote" style="margin-top:6px;"></div>
     </fieldset>
     <div class="grid" style="margin-top:12px;">
-      <div class="field"><label>Discount %</label><input type="number" id="e_discPct" value="${p.discountPercent}"></div>
-      <div class="field"><label>Discount Amount</label><input type="number" id="e_discAmt" value="${p.discountAmount}"></div>
+      <div class="field"><label>Discount %</label><input type="number" step="0.01" id="e_discPct" value="${p.discountPercent}"></div>
+      <div class="field"><label>Discount Amount</label><input type="number" step="0.01" id="e_discAmt" value="${p.discountAmount}"></div>
       <div class="field"><label>Paid Amount</label><input type="number" id="e_paid" value="${p.paidAmount}"></div>
     </div>
     <div class="actions-row">
@@ -992,21 +1028,166 @@ function openPaymentModal(id){
       <div><span>Already Paid</span><b>${fmt(p.paidAmount)}</b></div>
       <div><span>Balance Due</span><b style="color:var(--red)">${fmt(due)}</b></div>
     </div>
-    <div class="field" style="margin-top:14px;"><label>Total Paid Amount (₹)</label><input type="number" id="pay_amt" value="${p.paidAmount}"></div>
+    <div class="grid" style="margin-top:14px;">
+      <div class="field"><label>Amount Received Now (₹)</label><input type="number" step="0.01" min="0" id="pay_new_amt" value="${due>0?due:0}"></div>
+      <div class="field"><label>Payment Mode</label><select id="pay_new_mode"><option value="Cash">Cash</option><option value="Online">Online</option></select></div>
+    </div>
     <div class="actions-row">
       <button class="btn btn-outline" onclick="closeModal('paymentModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="savePayment('${id}')">Update Payment</button>
+      <button class="btn btn-primary" onclick="savePayment('${id}')">Record Payment</button>
     </div>`;
   openModal('paymentModal');
 }
 function savePayment(id){
   const list = loadPatients();
   const p = list.find(x=>x.id===id);
-  p.paidAmount = parseFloat(document.getElementById('pay_amt').value)||0;
+  const newAmt = parseFloat(document.getElementById('pay_new_amt').value)||0;
+  const mode = document.getElementById('pay_new_mode').value;
+  if(newAmt > 0){
+    if(!Array.isArray(p.payments)) p.payments = [];
+    p.payments.push({ amount: newAmt, mode, date: new Date().toISOString() });
+    p.paidAmount = (p.paidAmount||0) + newAmt;
+  }
   p.paymentStatus = p.paidAmount<=0 ? 'Due' : (p.paidAmount>=p.netAmount ? 'Paid' : 'Partial');
   savePatients(list);
   closeModal('paymentModal');
   renderAdminTable(); renderFrontTable(); renderLabTable();
+}
+
+/* ================= ACCOUNTS: DAILY LEDGER ================= */
+// Converts an ISO timestamp to a local YYYY-MM-DD date string, so "today"
+// lines up with the clinic's local day rather than UTC.
+function toLocalDateStr(iso){
+  const d = new Date(iso);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function setAccDateToday(){
+  document.getElementById('acc_date').value = toLocalDateStr(new Date().toISOString());
+  renderAccountsLedger();
+}
+function getSelectedAccDate(){
+  const el = document.getElementById('acc_date');
+  if(!el.value) el.value = toLocalDateStr(new Date().toISOString());
+  return el.value;
+}
+// Builds a flat list of every payment received on the given date, across all
+// patients, each tagged with the patient's name/SIN and a short description
+// of the tests they came in for.
+function collectLedgerEntries(dateStr){
+  const rows = [];
+  loadPatients().forEach(p=>{
+    let payments = Array.isArray(p.payments) ? p.payments : [];
+    // Older patient records created before payment-mode tracking was added
+    // won't have a payments[] array. Fall back to a single synthetic entry
+    // so their historical payment still shows up in the ledger.
+    if(payments.length===0 && (p.paidAmount||0) > 0){
+      payments = [{ amount: p.paidAmount, mode: 'Not Recorded', date: p.createdAt }];
+    }
+    const desc = (p.tests||[]).map(t=>t.name).join(', ') || '—';
+    payments.forEach(pay=>{
+      if(toLocalDateStr(pay.date) === dateStr){
+        rows.push({
+          time: new Date(pay.date).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}),
+          sortTime: pay.date,
+          sin: p.sin,
+          name: p.name,
+          desc,
+          mode: pay.mode || 'Not Recorded',
+          amount: pay.amount
+        });
+      }
+    });
+  });
+  rows.sort((a,b)=> new Date(a.sortTime) - new Date(b.sortTime));
+  return rows;
+}
+function renderAccountsLedger(){
+  const dateStr = getSelectedAccDate();
+  const rows = collectLedgerEntries(dateStr);
+  document.getElementById('ledgerCount').textContent = rows.length;
+  document.getElementById('ledgerTableBody').innerHTML = rows.length ? rows.map(r=>`
+    <tr>
+      <td>${r.time}</td>
+      <td>${r.sin}</td>
+      <td>${r.name}</td>
+      <td>${r.desc}</td>
+      <td>${r.mode}</td>
+      <td>${fmt(r.amount)}</td>
+    </tr>`).join('') : `<tr><td colspan="6" class="note" style="text-align:center;padding:20px;">No payments recorded for this date.</td></tr>`;
+
+  const cash = rows.filter(r=>r.mode==='Cash').reduce((s,r)=>s+r.amount,0);
+  const online = rows.filter(r=>r.mode==='Online').reduce((s,r)=>s+r.amount,0);
+  const other = rows.filter(r=>r.mode!=='Cash' && r.mode!=='Online').reduce((s,r)=>s+r.amount,0);
+  const total = cash + online + other;
+  let summaryRows = `
+    <tr><td>Cash</td><td>${fmt(cash)}</td></tr>
+    <tr><td>Online</td><td>${fmt(online)}</td></tr>`;
+  if(other>0) summaryRows += `<tr><td>Not Recorded</td><td>${fmt(other)}</td></tr>`;
+  summaryRows += `<tr style="font-weight:700;"><td>Total Sale</td><td>${fmt(total)}</td></tr>`;
+  document.getElementById('ledgerSummaryBody').innerHTML = summaryRows;
+}
+function downloadDailyLedgerPDF(){
+  const dateStr = getSelectedAccDate();
+  const rows = collectLedgerEntries(dateStr);
+  const cash = rows.filter(r=>r.mode==='Cash').reduce((s,r)=>s+r.amount,0);
+  const online = rows.filter(r=>r.mode==='Online').reduce((s,r)=>s+r.amount,0);
+  const other = rows.filter(r=>r.mode!=='Cash' && r.mode!=='Online').reduce((s,r)=>s+r.amount,0);
+  const total = cash + online + other;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+
+  doc.setFillColor(27,168,201);
+  doc.rect(0,0,595,70,'F');
+  doc.setTextColor('#fff'); doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('Go For Diagnostics', 36, 32);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Daily Ledger / Accounts Report', 36, 50);
+
+  doc.setTextColor('#1a2a3a'); doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text('Date: ' + dateStr, 36, 96);
+  doc.text('Generated: ' + new Date().toLocaleString('en-IN'), 350, 96);
+
+  let y = 125;
+  doc.setDrawColor(27,168,201); doc.line(36,y,559,y); y+=18;
+  doc.setFontSize(9.5);
+  doc.text('Time', 36, y); doc.text('SIN', 80, y); doc.text('Patient', 140, y);
+  doc.text('Description', 260, y); doc.text('Mode', 460, y); doc.text('Amount', 510, y);
+  y += 8; doc.line(36,y,559,y); y += 14;
+  doc.setFont('helvetica','normal');
+
+  if(rows.length===0){
+    doc.text('No payments recorded for this date.', 36, y);
+    y += 18;
+  } else {
+    rows.forEach(r=>{
+      if(y > 760){ doc.addPage(); y = 40; }
+      doc.text(r.time, 36, y);
+      doc.text(r.sin || '-', 80, y);
+      doc.text(r.name, 140, y, {maxWidth:115});
+      doc.text(r.desc, 260, y, {maxWidth:195});
+      doc.text(r.mode, 460, y);
+      doc.text(fmtPdf(r.amount), 510, y);
+      y += 18;
+    });
+  }
+
+  y += 10;
+  if(y > 740){ doc.addPage(); y = 40; }
+  doc.line(36,y,559,y); y += 22;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('Summary — Total Sale', 36, y); y += 20;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10.5);
+  const summaryRows = [
+    ['Cash', fmtPdf(cash)],
+    ['Online', fmtPdf(online)]
+  ];
+  if(other>0) summaryRows.push(['Not Recorded', fmtPdf(other)]);
+  summaryRows.forEach(([l,v])=>{ doc.text(l, 350, y); doc.text(v, 480, y); y += 18; });
+  doc.setFont('helvetica','bold');
+  doc.text('Total Sale', 350, y); doc.text(fmtPdf(total), 480, y);
+
+  doc.save('Daily_Ledger_' + dateStr + '.pdf');
 }
 
 /* ---- Test master (admin) ---- */
